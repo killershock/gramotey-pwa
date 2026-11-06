@@ -1,7 +1,6 @@
-const CACHE_NAME = "gramotey-v1.0.4";
+const CACHE_NAME = "gramotey-v1.0.5";
 
 const APP_SHELL = [
-  "./",
   "./index.html",
   "./css/styles.css",
   "./js/app.js",
@@ -48,29 +47,52 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => caches.match(request).then((hit) => hit || caches.match("./index.html")))
-    );
+    event.respondWith(handleNavigation(request));
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((hit) => {
-      if (hit) return hit;
-
-      return fetch(request).then((response) => {
-        if (response && response.status === 200 && response.type === "basic") {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      });
-    })
-  );
+  event.respondWith(handleAsset(request));
 });
+
+async function handleNavigation(request) {
+  try {
+    const response = await fetch(request);
+
+    // Кешируем только успешные ответы. Прокси/хостинг может вернуть 502 —
+    // такой ответ нельзя сохранять, иначе офлайн откроется пустая страница.
+    if (response && response.ok) {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+      return response;
+    }
+
+    const cachedShell = await caches.match("./index.html");
+    if (cachedShell) return cachedShell;
+    return response;
+  } catch {
+    const cachedShell = await caches.match("./index.html");
+    if (cachedShell) return cachedShell;
+
+    return new Response("Приложение ещё не сохранено для офлайн-режима. Откройте его один раз с интернетом.", {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8" }
+    });
+  }
+}
+
+async function handleAsset(request) {
+  const cached = await caches.match(request);
+  if (cached && cached.ok) return cached;
+
+  try {
+    const response = await fetch(request);
+    if (response && response.ok && response.type === "basic") {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+    }
+    return response;
+  } catch {
+    if (cached) return cached;
+    return new Response("", { status: 504 });
+  }
+}
