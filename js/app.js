@@ -1355,6 +1355,10 @@ function registerServiceWorker() {
 
 function init() {
   state.settings = loadSettings();
+
+  if (typeof state.settings.autoFix !== "boolean") state.settings.autoFix = true;
+  if (typeof state.settings.autoFixSpelling !== "boolean") state.settings.autoFixSpelling = true;
+
   state.text = normalize(loadDraft());
   dom.editor.value = state.text;
 

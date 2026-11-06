@@ -1,3 +1,5 @@
+import { isProtectedWord } from "./protected.js";
+
 export const DEFAULT_ENDPOINT = "https://api.languagetool.org/v2/check";
 export const MAX_ONLINE_CHARS = 18000;
 
@@ -71,6 +73,10 @@ export function matchesToIssues(matches, text) {
     const start = match.offset;
     const end = start + match.length;
     if (start < 0 || end > text.length || end < start) continue;
+
+    const original = text.slice(start, end);
+    // Мат и сленг не проверяем: иначе «бля» предлагают заменить на «Юля»/«для»/«Оля».
+    if (isProtectedWord(original)) continue;
 
     const replacements = Array.isArray(match.replacements) ? match.replacements : [];
     const suggestions = replacements

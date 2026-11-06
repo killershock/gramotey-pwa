@@ -5,7 +5,7 @@ export const DEFAULT_SETTINGS = {
   onlineCheck: true,
   localRules: true,
   autoFix: true,
-  autoFixSpelling: false,
+  autoFixSpelling: true,
   nativeSpellcheck: false,
   language: "auto",
   endpoint: "https://api.languagetool.org/v2/check",

@@ -1,5 +1,4 @@
 import { detectLanguage, isLetter, isUppercaseLetter } from "./utils.js";
-
 export const KIND_META = {
   spelling: { title: "Орфография", color: "#dc2626" },
   punctuation: { title: "Пунктуация", color: "#2563eb" },
