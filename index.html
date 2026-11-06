@@ -217,6 +217,14 @@
 
       <section class="issues" id="issues" aria-live="polite"></section>
 
+      <section class="corrections" id="corrections" hidden>
+        <div class="corrections-head">
+          <h2>Что исправлено <span class="corrections-count" id="correctionsCount"></span></h2>
+          <button class="text-btn" id="undoCorrections" type="button" hidden>Вернуть всё</button>
+        </div>
+        <div class="corrections-list" id="correctionsList"></div>
+      </section>
+
       <footer class="footnote">
         <p>Проверка выполняется в браузере. Онлайн-проверка отправляет текст в LanguageTool, ИИ-редактор — выбранному сервису.</p>
       </footer>
@@ -320,6 +328,22 @@
             <small>Пробелы, тире, кавычки, повторы — работают офлайн</small>
           </span>
           <input type="checkbox" id="optLocal" />
+        </label>
+
+        <label class="switch-row">
+          <span class="switch-copy">
+            <strong>Автоисправление</strong>
+            <small>Сразу исправлять пробелы, пунктуацию, кавычки и повторы</small>
+          </span>
+          <input type="checkbox" id="optAutoFix" />
+        </label>
+
+        <label class="switch-row">
+          <span class="switch-copy">
+            <strong>Автоорфография</strong>
+            <small>Автоматически применять и подсказки LanguageTool</small>
+          </span>
+          <input type="checkbox" id="optAutoFixSpelling" />
         </label>
 
         <label class="switch-row">

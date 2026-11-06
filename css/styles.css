@@ -762,6 +762,99 @@ svg {
   text-align: center;
 }
 
+/* MARK: - Журнал исправлений */
+
+.corrections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.corrections-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 2px;
+}
+
+.corrections-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.corrections-count {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.corrections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.correction {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--bg-elev);
+}
+
+.correction-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: var(--c, var(--accent));
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.correction-change {
+  margin: 0 0 4px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.correction-before,
+.correction-after {
+  display: inline;
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+
+.correction-before {
+  color: var(--danger);
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.correction-after {
+  color: var(--ok);
+  background: rgba(18, 134, 74, 0.1);
+}
+
+.correction-why {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.correction-more {
+  color: var(--muted-2);
+  font-size: 12px;
+  text-align: center;
+}
+
 .footnote p {
   margin: 0;
 }

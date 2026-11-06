@@ -21,6 +21,10 @@ const dom = {
   langBadge: $("langBadge"),
   charCount: $("charCount"),
   issues: $("issues"),
+  corrections: $("corrections"),
+  correctionsCount: $("correctionsCount"),
+  correctionsList: $("correctionsList"),
+  undoCorrections: $("undoCorrections"),
   installTip: $("installTip"),
   installTipClose: $("installTipClose"),
   statusText: $("statusText"),
@@ -62,6 +66,8 @@ const dom = {
 
   optOnline: $("optOnline"),
   optLocal: $("optLocal"),
+  optAutoFix: $("optAutoFix"),
+  optAutoFixSpelling: $("optAutoFixSpelling"),
   optNative: $("optNative"),
   optLanguage: $("optLanguage"),
   endpoint: $("endpoint"),
@@ -90,6 +96,11 @@ const state = {
   onlineController: null,
   cooldownUntil: 0,
   bannerDismissed: false,
+  corrections: [],
+  autoFix: {
+    passes: 0,
+    undoText: null
+  },
   ai: {
     mode: "polish",
     targetLanguage: "английский",
@@ -104,6 +115,9 @@ const state = {
 let localTimer = 0;
 let onlineTimer = 0;
 let toastTimer = 0;
+let autoFixTimer = 0;
+let autoFixBusy = false;
+let correctionSequence = 0;
 let deferredPrompt = null;
 
 // MARK: - Утилиты интерфейса
@@ -193,22 +207,30 @@ function syncHighlightScroll() {
 function setText(value, { focus = false } = {}) {
   state.text = normalize(value);
   dom.editor.value = state.text;
+  state.autoFix.undoText = null;
+  state.autoFix.passes = 0;
+  dom.undoCorrections.hidden = true;
   saveDraft(state.text);
   autoGrow();
   updateMeta();
   if (focus) dom.editor.focus({ preventScroll: true });
   runCheckNow(250);
+  scheduleAutoFix(600);
 }
 
 function onInput() {
   state.text = dom.editor.value;
   invalidateOnline();
+  state.autoFix.undoText = null;
+  state.autoFix.passes = 0;
+  dom.undoCorrections.hidden = true;
   saveDraftDebounced(state.text);
   autoGrow();
   updateMeta();
   renderHighlights();
   renderStatus();
   scheduleCheck();
+  scheduleAutoFix(1500);
 }
 
 function invalidateOnline() {
@@ -273,6 +295,10 @@ function clearText() {
   state.text = "";
   dom.editor.value = "";
   clearDraft();
+  state.corrections = [];
+  state.autoFix.undoText = null;
+  state.autoFix.passes = 0;
+  renderCorrections();
   autoGrow();
   updateMeta();
   runCheckNow(0);
@@ -379,6 +405,10 @@ async function fetchOnlineCheck() {
     state.onlineText = text;
     state.onlineStatus = "ok";
     state.onlineError = "";
+
+    if (state.settings.autoFixSpelling) {
+      scheduleAutoFix(300);
+    }
   } catch (error) {
     if (error?.name === "AbortError" || token !== state.onlineToken) return;
 
@@ -437,6 +467,170 @@ function rangesOverlap(lhs, rhs) {
   if (lhsLength === 0) return rhs.start < lhs.start && lhs.start < rhs.end;
   if (rhsLength === 0) return lhs.start < rhs.start && rhs.start < lhs.end;
   return Math.max(lhs.start, rhs.start) < Math.min(lhs.end, rhs.end);
+}
+
+// MARK: - Автоисправление
+
+function scheduleAutoFix(delay = 1500) {
+  clearTimeout(autoFixTimer);
+  if (!state.settings.autoFix) return;
+  autoFixTimer = setTimeout(maybeAutoFix, delay);
+}
+
+function maybeAutoFix() {
+  if (!state.settings.autoFix || autoFixBusy) return;
+  if (!state.text.trim()) return;
+
+  // Ждём, пока проверка текущего текста завершится.
+  if (state.checkedText !== state.text) {
+    scheduleAutoFix(400);
+    return;
+  }
+
+  if (state.autoFix.passes >= 2) return;
+
+  const allowOnline = Boolean(state.settings.autoFixSpelling);
+  const applicable = state.issues
+    .filter((issue) => issue.suggestions.length > 0)
+    .filter((issue) => allowOnline || issue.source === "local")
+    .filter((issue) => issue.end <= state.text.length)
+    .filter((issue) => issue.insertion || state.text.slice(issue.start, issue.end) === issue.original)
+    .sort((lhs, rhs) => rhs.start - lhs.start || rhs.end - lhs.end);
+
+  if (!applicable.length) return;
+
+  autoFixBusy = true;
+
+  const beforeText = state.text;
+  const caret = dom.editor.selectionStart || 0;
+  let next = beforeText;
+  let nextCaret = caret;
+  const corrections = [];
+
+  for (const issue of applicable) {
+    const value = issue.suggestions[0].value;
+    const delta = value.length - (issue.end - issue.start);
+    if (issue.start < nextCaret) nextCaret += delta;
+
+    next = next.slice(0, issue.start) + value + next.slice(issue.end);
+    corrections.push({
+      kind: issue.kind,
+      before: issue.original,
+      after: value,
+      message: issue.message,
+      insertion: issue.insertion,
+      position: issue.start
+    });
+  }
+
+  if (next === beforeText) {
+    autoFixBusy = false;
+    return;
+  }
+
+  if (state.autoFix.passes === 0) {
+    state.autoFix.undoText = beforeText;
+  }
+  state.autoFix.passes += 1;
+
+  state.text = next;
+  dom.editor.value = next;
+  saveDraft(next);
+  autoGrow();
+  updateMeta();
+
+  if (document.activeElement === dom.editor) {
+    const position = Math.max(0, Math.min(nextCaret, next.length));
+    dom.editor.setSelectionRange(position, position);
+  }
+
+  addCorrections(corrections);
+  autoFixBusy = false;
+
+  runCheckNow(0);
+  toast(`Исправлено: ${corrections.length}`);
+  scheduleAutoFix(700);
+}
+
+function addCorrections(list) {
+  if (!list.length) return;
+
+  const ordered = [...list].sort((lhs, rhs) => (lhs.position || 0) - (rhs.position || 0));
+  const entries = ordered.map((item) => ({
+    id: `correction-${++correctionSequence}`,
+    ...item
+  }));
+
+  state.corrections = [...entries, ...state.corrections].slice(0, 60);
+  renderCorrections();
+}
+
+function renderCorrections() {
+  const hasCorrections = state.corrections.length > 0;
+  dom.corrections.hidden = !hasCorrections;
+  dom.undoCorrections.hidden = !state.autoFix.undoText;
+
+  if (!hasCorrections) {
+    dom.correctionsList.innerHTML = "";
+    dom.correctionsCount.textContent = "";
+    return;
+  }
+
+  dom.correctionsCount.textContent = `(${state.corrections.length})`;
+  dom.correctionsList.innerHTML = "";
+
+  const visible = state.corrections.slice(0, 12);
+  for (const item of visible) {
+    const meta = KIND_META[item.kind] || KIND_META.punctuation;
+    const row = createElement("div", "correction");
+    row.style.setProperty("--c", meta.color);
+
+    row.appendChild(createElement("div", "correction-top", meta.title));
+
+    const change = createElement("p", "correction-change");
+    change.appendChild(createElement("span", "correction-before", displayValue(item.before, item.insertion)));
+    change.append(" → ");
+    change.appendChild(createElement("span", "correction-after", displayValue(item.after, false)));
+    row.appendChild(change);
+
+    row.appendChild(createElement("p", "correction-why", item.message));
+    dom.correctionsList.appendChild(row);
+  }
+
+  if (state.corrections.length > visible.length) {
+    dom.correctionsList.appendChild(
+      createElement("p", "correction-more", `Ещё ${state.corrections.length - visible.length} исправлений`)
+    );
+  }
+}
+
+function displayValue(value, insertion) {
+  if (insertion) return "нет";
+  if (value === "" || value === undefined || value === null) {
+    return "удалено";
+  }
+  return String(value)
+    .replace(/ /g, "␣")
+    .replace(/\n/g, "↵")
+    .replace(/\t/g, "⇥");
+}
+
+function undoAutoFix() {
+  if (!state.autoFix.undoText) return;
+
+  const value = state.autoFix.undoText;
+  state.autoFix.undoText = null;
+  state.autoFix.passes = 0;
+  state.corrections = [];
+
+  state.text = value;
+  dom.editor.value = value;
+  saveDraft(value);
+  autoGrow();
+  updateMeta();
+  renderCorrections();
+  runCheckNow(0);
+  toast("Изменения отменены");
 }
 
 // MARK: - Отрисовка
@@ -704,6 +898,14 @@ function applySuggestion(issue, suggestion) {
   }
 
   const next = text.slice(0, start) + suggestion.value + text.slice(end);
+  addCorrections([{
+    kind: issue.kind,
+    before: issue.original,
+    after: suggestion.value,
+    message: issue.message,
+    insertion: issue.insertion,
+    position: issue.start
+  }]);
   setText(next);
   toast("Исправлено");
 }
@@ -731,10 +933,21 @@ function fixAll() {
   applicable.sort((lhs, rhs) => rhs.start - lhs.start || rhs.end - lhs.end);
 
   let text = state.text;
+  const corrections = [];
+
   for (const issue of applicable) {
     text = text.slice(0, issue.start) + issue.suggestions[0].value + text.slice(issue.end);
+    corrections.push({
+      kind: issue.kind,
+      before: issue.original,
+      after: issue.suggestions[0].value,
+      message: issue.message,
+      insertion: issue.insertion,
+      position: issue.start
+    });
   }
 
+  addCorrections(corrections);
   setText(text);
   toast("Применены все исправления");
 }
@@ -889,6 +1102,8 @@ function persistSettings() {
 function syncSettingsUI() {
   dom.optOnline.checked = state.settings.onlineCheck;
   dom.optLocal.checked = state.settings.localRules;
+  dom.optAutoFix.checked = state.settings.autoFix;
+  dom.optAutoFixSpelling.checked = state.settings.autoFixSpelling;
   dom.optNative.checked = state.settings.nativeSpellcheck;
   dom.optLanguage.value = state.settings.language;
   dom.endpoint.value = state.settings.endpoint;
@@ -910,6 +1125,26 @@ function bindSettings() {
     state.settings.localRules = dom.optLocal.checked;
     persistSettings();
     runCheckNow(0);
+  });
+
+  dom.optAutoFix.addEventListener("change", () => {
+    state.settings.autoFix = dom.optAutoFix.checked;
+    state.autoFix.passes = 0;
+    persistSettings();
+    if (state.settings.autoFix) {
+      scheduleAutoFix(300);
+    } else {
+      clearTimeout(autoFixTimer);
+    }
+  });
+
+  dom.optAutoFixSpelling.addEventListener("change", () => {
+    state.settings.autoFixSpelling = dom.optAutoFixSpelling.checked;
+    state.autoFix.passes = 0;
+    persistSettings();
+    if (state.settings.autoFix && state.settings.autoFixSpelling) {
+      scheduleAutoFix(300);
+    }
   });
 
   dom.optNative.addEventListener("change", () => {
@@ -1041,7 +1276,11 @@ function bindEvents() {
   dom.copyBtn.addEventListener("click", () => copyText(state.text));
   dom.clearBtn.addEventListener("click", clearText);
 
-  dom.refreshBtn.addEventListener("click", () => runCheckNow(0));
+  dom.refreshBtn.addEventListener("click", () => {
+    state.autoFix.passes = 0;
+    runCheckNow(0);
+    scheduleAutoFix(500);
+  });
   dom.fixAllBtn.addEventListener("click", fixAll);
 
   dom.bannerRetry.addEventListener("click", () => runCheckNow(0));
@@ -1049,6 +1288,8 @@ function bindEvents() {
     state.bannerDismissed = true;
     renderBanner();
   });
+
+  dom.undoCorrections.addEventListener("click", undoAutoFix);
 
   dom.settingsBtn.addEventListener("click", () => {
     syncSettingsUI();
@@ -1127,6 +1368,7 @@ function init() {
   autoGrow();
   updateMeta();
   renderAll();
+  renderCorrections();
 
   if (state.text.trim()) {
     runCheckNow(0);
