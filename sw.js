@@ -1,6 +1,6 @@
 // Грамотей — service worker.
 // Кешируем только успешные ответы, офлайн отдаём сохранённый index.html.
-const CACHE_NAME = "gramotey-v1.0.7";
+const CACHE_NAME = "gramotey-v1.0.8";
 
 const APP_SHELL = [
   "./index.html",
