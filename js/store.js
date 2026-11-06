@@ -7,9 +7,9 @@ export const DEFAULT_SETTINGS = {
   nativeSpellcheck: false,
   language: "auto",
   endpoint: "https://api.languagetool.org/v2/check",
-  provider: "openai",
-  apiBaseURL: "https://api.openai.com/v1",
-  apiModel: "gpt-4o-mini",
+  provider: "gemini",
+  apiBaseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+  apiModel: "gemini-3.5-flash-lite",
   apiKey: ""
 };
 

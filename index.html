@@ -88,6 +88,31 @@
       <path d="M9 9h.01" />
       <path d="M15 9h.01" />
     </symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z" />
+    </symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24">
+      <path d="M12 2c2 4 5 5 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2-5 0 2 1 3 2 3 1-2 1-4 1-7Z" />
+    </symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24">
+      <path d="M3 3v18h18" />
+      <rect x="7" y="12" width="3" height="6" />
+      <rect x="12" y="8" width="3" height="10" />
+      <rect x="17" y="5" width="3" height="13" />
+    </symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24">
+      <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8a7 7 0 0 1-7 7Z" />
+      <path d="M2 21c0-3 1.9-5.4 5-6" />
+    </symbol>
+    <symbol id="i-book" viewBox="0 0 24 24">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
+    </symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+    </symbol>
   </svg>
 
   <div class="app">
@@ -219,6 +244,23 @@
       <div id="aiBody">
         <h3 class="section-title">Как переписать</h3>
         <div class="mode-grid" id="modeGrid"></div>
+
+        <label class="field" id="translateField" hidden>
+          <span class="field-label">Перевести на</span>
+          <select id="targetLanguage">
+            <option value="английский">Английский</option>
+            <option value="русский">Русский</option>
+            <option value="немецкий">Немецкий</option>
+            <option value="французский">Французский</option>
+            <option value="испанский">Испанский</option>
+            <option value="итальянский">Итальянский</option>
+            <option value="китайский">Китайский</option>
+            <option value="арабский">Арабский</option>
+            <option value="турецкий">Турецкий</option>
+          </select>
+        </label>
+
+        <p class="hint">Режимы как в Telegram AI Editor — от «Официально» до «Викинга».</p>
         <p class="hint">Смысл, факты, имена и цифры сохраняются — меняются только формулировки.</p>
 
         <button class="btn primary block" id="aiRunBtn" type="button">
@@ -307,11 +349,13 @@
         <label class="field">
           <span class="field-label">Сервис</span>
           <select id="provider">
+            <option value="gemini">Google Gemini (бесплатный тариф)</option>
             <option value="openai">OpenAI</option>
             <option value="openrouter">OpenRouter</option>
             <option value="deepseek">DeepSeek</option>
             <option value="custom">Свой (прокси)</option>
           </select>
+          <span class="hint">У Gemini есть бесплатный тариф с лимитами. OpenAI и DeepSeek — платные, но недорогие.</span>
         </label>
 
         <label class="field">
@@ -321,7 +365,7 @@
 
         <label class="field">
           <span class="field-label">Модель</span>
-          <input type="text" id="apiModel" autocapitalize="off" spellcheck="false" placeholder="gpt-4o-mini" />
+          <input type="text" id="apiModel" autocapitalize="off" spellcheck="false" placeholder="gemini-3.5-flash-lite" />
         </label>
 
         <label class="field">

@@ -49,6 +49,8 @@ const dom = {
   modeGrid: $("modeGrid"),
   aiRunBtn: $("aiRunBtn"),
   aiRunLabel: $("aiRunLabel"),
+  translateField: $("translateField"),
+  targetLanguage: $("targetLanguage"),
   aiError: $("aiError"),
   aiResult: $("aiResult"),
   resultText: $("resultText"),
@@ -90,6 +92,7 @@ const state = {
   bannerDismissed: false,
   ai: {
     mode: "polish",
+    targetLanguage: "английский",
     busy: false,
     result: "",
     original: "",
@@ -765,8 +768,16 @@ function renderRewrite() {
 
   renderModeGrid();
 
+  const isTranslate = state.ai.mode === "translate";
+  dom.translateField.hidden = !isTranslate;
+  if (isTranslate) {
+    dom.targetLanguage.value = state.ai.targetLanguage;
+  }
+
   dom.aiRunBtn.disabled = state.ai.busy || !state.text.trim();
-  dom.aiRunLabel.textContent = state.ai.busy ? "Переписываю…" : "Переписать текст";
+  dom.aiRunLabel.textContent = state.ai.busy
+    ? (isTranslate ? "Перевожу…" : "Переписываю…")
+    : (isTranslate ? "Перевести текст" : "Переписать текст");
 
   dom.aiError.hidden = !state.ai.error;
   dom.aiError.textContent = state.ai.error || "";
@@ -812,7 +823,12 @@ function renderModeGrid() {
 
     button.addEventListener("click", () => {
       state.ai.mode = mode.id;
-      renderModeGrid();
+
+      if (mode.id === "translate") {
+        state.ai.targetLanguage = detectLanguage(state.text) === "ru" ? "английский" : "русский";
+      }
+
+      renderRewrite();
     });
 
     dom.modeGrid.appendChild(button);
@@ -839,6 +855,7 @@ async function runAI() {
     const result = await rewriteText({
       text: source,
       mode: state.ai.mode,
+      targetLanguage: state.ai.targetLanguage,
       settings: state.settings
     });
     state.ai.result = result;
@@ -1047,6 +1064,10 @@ function bindEvents() {
   });
 
   dom.aiRunBtn.addEventListener("click", runAI);
+
+  dom.targetLanguage.addEventListener("change", () => {
+    state.ai.targetLanguage = dom.targetLanguage.value;
+  });
 
   dom.diffToggle.addEventListener("click", () => {
     state.ai.showDiff = !state.ai.showDiff;

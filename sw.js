@@ -1,6 +1,6 @@
 // Грамотей — service worker.
 // Кешируем только успешные ответы, офлайн отдаём сохранённый index.html.
-const CACHE_NAME = "gramotey-v1.0.5";
+const CACHE_NAME = "gramotey-v1.0.7";
 
 const APP_SHELL = [
   "./index.html",
@@ -24,7 +24,19 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then(async (cache) => {
+        // cache: "reload" обходит HTTP-кеш браузера — после обновления
+        // в новый service worker не попадут старые файлы.
+        await Promise.all(
+          APP_SHELL.map(async (url) => {
+            const response = await fetch(url, { cache: "reload" });
+            if (!response || !response.ok) {
+              throw new Error(`Не удалось закешировать ${url}`);
+            }
+            await cache.put(url, response);
+          })
+        );
+      })
       .then(() => self.skipWaiting())
   );
 });

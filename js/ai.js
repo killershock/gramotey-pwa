@@ -1,12 +1,23 @@
 export const REWRITE_MODES = [
-  { id: "polish", title: "Вычитать", subtitle: "Исправить ошибки, сохранить ваш голос", icon: "i-check" },
+  { id: "polish", title: "Исправить", subtitle: "Ошибки и аккуратная правка, сохранить голос", icon: "i-check" },
+  { id: "translate", title: "Перевести", subtitle: "На другой язык, сохранив смысл", icon: "i-globe" },
   { id: "formal", title: "Официально", subtitle: "Деловой и нейтральный тон", icon: "i-briefcase" },
-  { id: "simple", title: "Проще", subtitle: "Простые слова, короткие фразы", icon: "i-bubble" },
   { id: "concise", title: "Короче", subtitle: "Убрать воду и повторы", icon: "i-scissors" },
-  { id: "friendly", title: "Дружелюбно", subtitle: "Живой тон без канцелярита", icon: "i-smile" }
+  { id: "simple", title: "Проще", subtitle: "Простые слова, короткие фразы", icon: "i-bubble" },
+  { id: "friendly", title: "Дружелюбно", subtitle: "Живой тон без канцелярита", icon: "i-smile" },
+  { id: "tribal", title: "Племенной", subtitle: "Коротко и по-варварски", icon: "i-flame" },
+  { id: "corp", title: "Корпоративный", subtitle: "Канцелярит и синергия", icon: "i-chart" },
+  { id: "zen", title: "Дзен", subtitle: "Спокойно и минималистично", icon: "i-leaf" },
+  { id: "biblical", title: "Библейский", subtitle: "Торжественно и архаично", icon: "i-book" },
+  { id: "viking", title: "Викинг", subtitle: "Сурово и эпично", icon: "i-shield" }
 ];
 
 export const PROVIDERS = {
+  gemini: {
+    label: "Google Gemini",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+    model: "gemini-3.5-flash-lite"
+  },
   openai: { label: "OpenAI", baseURL: "https://api.openai.com/v1", model: "gpt-4o-mini" },
   openrouter: { label: "OpenRouter", baseURL: "https://openrouter.ai/api/v1", model: "openai/gpt-4o-mini" },
   deepseek: { label: "DeepSeek", baseURL: "https://api.deepseek.com/v1", model: "deepseek-chat" },
@@ -18,7 +29,12 @@ const MODE_INSTRUCTIONS = {
   formal: "Перепиши текст в официально-деловом стиле: нейтрально, вежливо, без разговорных выражений. Смысл и факты сохрани полностью.",
   simple: "Упрости формулировки: разбей длинные предложения, замени сложные слова понятными. Смысл, имена, числа и факты сохрани.",
   concise: "Сократи текст, убери повторы и воду. Сохрани все важные детали, факты, имена и числа. Не добавляй ничего нового.",
-  friendly: "Сделай тон дружелюбным и живым, убери канцелярит. Смысл, факты и структуру сохрани."
+  friendly: "Сделай тон дружелюбным и живым, убери канцелярит. Смысл, факты и структуру сохрани.",
+  tribal: "Перепиши в стиле древнего племени: короткие рубленые фразы, простые сильные слова, архаичная интонация. Смысл, факты и имена сохрани.",
+  corp: "Перепиши в корпоративном стиле: деловая лексика, канцелярит, слова вроде «синергия», «процессы», «оптимизация». Смысл сохрани.",
+  zen: "Перепиши в стиле дзен: спокойно, созерцательно, минималистично, короткими фразами. Смысл и факты сохрани.",
+  biblical: "Перепиши в библейском стиле: торжественно, архаично, с библейскими оборотами и ритмом. Смысл, факты и имена сохрани.",
+  viking: "Перепиши в стиле викинга: сурово, эпично, с северными образами и короткими фразами. Смысл, факты и имена сохрани."
 };
 
 export class AIError extends Error {
@@ -38,28 +54,41 @@ const SYSTEM_PROMPT = `Ты — профессиональный редакто�
 5. Не используй markdown, не добавляй пояснения, заголовки и кавычки вокруг ответа.
 Возвращай только итоговый текст.`;
 
-export async function rewriteText({ text, mode, settings }) {
+export async function rewriteText({ text, mode, targetLanguage, settings }) {
   const source = text.trim();
   if (!source) throw new AIError("Сначала добавьте текст.", "empty");
 
   const apiKey = String(settings.apiKey || "").trim();
   if (!apiKey) throw new AIError("Добавьте ключ API в настройках.", "config");
 
-  const base = String(settings.apiBaseURL || "").trim().replace(/\/+$/, "");
+  const base = normalizeBaseURL(settings.apiBaseURL);
   if (!base) throw new AIError("Укажите адрес API в настройках.", "config");
 
   const model = String(settings.apiModel || "").trim();
   if (!model) throw new AIError("Укажите модель в настройках.", "config");
 
-  const instruction = MODE_INSTRUCTIONS[mode] || MODE_INSTRUCTIONS.polish;
+  const isTranslate = mode === "translate";
+  const instruction = isTranslate
+    ? `Переведи текст на ${targetLanguage || "русский"}. Сохрани смысл, имена, числа, ссылки и структуру абзацев. Верни только перевод.`
+    : (MODE_INSTRUCTIONS[mode] || MODE_INSTRUCTIONS.polish);
+
+  const systemContent = isTranslate
+    ? SYSTEM_PROMPT.replace(
+        "4. Не меняй язык текста.",
+        "4. Переведи текст на язык, указанный в задании."
+      )
+    : SYSTEM_PROMPT;
+
   const body = {
     model,
     temperature: 0.2,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: systemContent },
       {
         role: "user",
-        content: `Режим: ${instruction}\n\nЕсли текст уже корректен, верни его без изменений.\n\nТекст:\n${source}`
+        content: isTranslate
+          ? `Задача: ${instruction}\n\nТекст:\n${source}`
+          : `Режим: ${instruction}\n\nЕсли текст уже корректен, верни его без изменений.\n\nТекст:\n${source}`
       }
     ]
   };
@@ -84,15 +113,17 @@ export async function rewriteText({ text, mode, settings }) {
   const raw = await response.text();
 
   if (!response.ok) {
-    let message = "";
-    try {
-      const payload = JSON.parse(raw);
-      message = payload?.error?.message || payload?.message || "";
-    } catch {
-      message = "";
-    }
-    if (!message) message = `Сервис ответил ошибкой ${response.status}.`;
-    throw new AIError(message, "http");
+    const message = extractErrorMessage(raw);
+    const hint = response.status === 404 && !/model|модел/i.test(message)
+      ? " Проверьте адрес API — он должен начинаться с https:// и заканчиваться на /openai или /v1."
+      : "";
+
+    throw new AIError(
+      message
+        ? `${message}${hint}`
+        : `Сервис ответил ошибкой ${response.status}.${hint}`,
+      "http"
+    );
   }
 
   let payload;
@@ -121,6 +152,39 @@ function extractContent(value) {
       .join("");
   }
   return "";
+}
+
+function normalizeBaseURL(value) {
+  let base = String(value || "").trim().replace(/\/+$/, "");
+  if (!base) return "";
+
+  if (!/^https?:\/\//i.test(base)) {
+    base = `https://${base}`;
+  }
+
+  return base.replace(/\/chat\/completions$/i, "");
+}
+
+function extractErrorMessage(raw) {
+  try {
+    let payload = JSON.parse(raw);
+    if (Array.isArray(payload)) payload = payload[0];
+
+    const message = payload?.error?.message || payload?.message || payload?.detail;
+    if (typeof message === "string" && message.trim()) {
+      return message.trim();
+    }
+  } catch {
+    // Ответ не JSON — ниже попробуем вытащить текст из HTML.
+  }
+
+  return String(raw || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240);
 }
 
 function cleanup(value) {
