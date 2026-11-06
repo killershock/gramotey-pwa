@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Грамотей — проверка текста</title>
+  <meta name="description" content="Проверка орфографии, пунктуации и грамматики. Подсказки и бережное переписывание текста с сохранением смысла." />
+  <meta name="theme-color" content="#2f66d0" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <link rel="icon" href="./icons/favicon-32.png" sizes="32x32" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Грамотей" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-gear" viewBox="0 0 24 24">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24">
+      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+      <path d="M5 3v4" />
+      <path d="M19 17v4" />
+      <path d="M3 5h4" />
+      <path d="M17 19h4" />
+    </symbol>
+    <symbol id="i-x" viewBox="0 0 24 24">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24">
+      <path d="M21 12a9 9 0 1 1-3-6.7" />
+      <path d="M21 3v6h-6" />
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24">
+      <path d="m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M12 15V3" />
+    </symbol>
+    <symbol id="i-key" viewBox="0 0 24 24">
+      <circle cx="7.5" cy="15.5" r="5.5" />
+      <path d="m21 2-9.6 9.6" />
+      <path d="m15.5 7.5 3 3L22 7l-3-3" />
+    </symbol>
+    <symbol id="i-clipboard" viewBox="0 0 24 24">
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24">
+      <path d="M3 6h18" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+      <path d="m20 6-11 11-5-5" />
+    </symbol>
+    <symbol id="i-briefcase" viewBox="0 0 24 24">
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+    </symbol>
+    <symbol id="i-bubble" viewBox="0 0 24 24">
+      <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z" />
+    </symbol>
+    <symbol id="i-scissors" viewBox="0 0 24 24">
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="6" cy="18" r="3" />
+      <path d="M20 4 8.1 15.9" />
+      <path d="m14.5 14.5 5.5 5.5" />
+      <path d="M8.1 8.1 12 12" />
+    </symbol>
+    <symbol id="i-smile" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+      <path d="M9 9h.01" />
+      <path d="M15 9h.01" />
+    </symbol>
+  </svg>
+
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <img class="brand-icon" src="./icons/icon-192.png" alt="" width="40" height="40" />
+        <div class="brand-text">
+          <h1>Грамотей</h1>
+          <p>Текст без ошибок</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" id="installHeaderBtn" title="Установить приложение" aria-label="Установить приложение" hidden>
+          <svg><use href="#i-download" /></svg>
+        </button>
+        <button class="icon-btn" id="settingsBtn" aria-label="Настройки">
+          <svg><use href="#i-gear" /></svg>
+        </button>
+        <button class="icon-btn accent" id="rewriteBtn" aria-label="Переписать текст">
+          <svg><use href="#i-sparkles" /></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="install-tip" id="installTip" hidden>
+        <span class="install-tip-icon">
+          <svg><use href="#i-download" /></svg>
+        </span>
+        <p>Установите «Грамотей» на iPhone: в Safari нажмите <strong>«Поделиться»</strong> → <strong>«На экран “Домой”»</strong>.</p>
+        <button class="icon-btn small" id="installTipClose" type="button" aria-label="Скрыть подсказку">
+          <svg><use href="#i-x" /></svg>
+        </button>
+      </div>
+
+      <section class="card editor-card">
+        <div class="card-head">
+          <span class="card-title">Ваш текст</span>
+          <div class="meta">
+            <span class="badge" id="langBadge">RU</span>
+            <span class="meta-count" id="charCount">0 симв.</span>
+          </div>
+        </div>
+
+        <div class="editor-shell">
+          <div class="editor-highlights" aria-hidden="true">
+            <div class="hl-inner" id="hlInner"></div>
+          </div>
+          <textarea
+            id="editor"
+            rows="5"
+            spellcheck="false"
+            autocapitalize="sentences"
+            autocomplete="off"
+            aria-label="Текст для проверки"
+            placeholder="Напишите или вставьте текст — проверю орфографию, пунктуацию и лишние пробелы."
+          ></textarea>
+        </div>
+
+        <div class="editor-actions">
+          <button class="text-btn" id="pasteBtn" type="button">
+            <svg><use href="#i-clipboard" /></svg><span>Вставить</span>
+          </button>
+          <button class="text-btn" id="copyBtn" type="button">
+            <svg><use href="#i-copy" /></svg><span>Копировать</span>
+          </button>
+          <span class="grow"></span>
+          <button class="text-btn danger" id="clearBtn" type="button">
+            <svg><use href="#i-trash" /></svg><span>Очистить</span>
+          </button>
+        </div>
+      </section>
+
+      <div class="statusbar card">
+        <div class="status-left">
+          <span class="spinner" id="statusSpinner" hidden></span>
+          <span class="status-dot" id="statusDot" hidden></span>
+          <span id="statusText">Начните печатать — проверю ошибки</span>
+        </div>
+        <div class="status-actions">
+          <button class="btn small primary" id="fixAllBtn" type="button" hidden>Исправить всё</button>
+          <button class="icon-btn small" id="refreshBtn" type="button" aria-label="Проверить сейчас">
+            <svg><use href="#i-refresh" /></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="banner" id="banner" hidden>
+        <svg class="banner-icon"><use href="#i-alert" /></svg>
+        <div class="banner-body">
+          <p id="bannerText"></p>
+          <p class="banner-note" id="bannerNote" hidden></p>
+        </div>
+        <button class="text-btn" id="bannerRetry" type="button">Повторить</button>
+        <button class="icon-btn small" id="bannerClose" type="button" aria-label="Скрыть сообщение">
+          <svg><use href="#i-x" /></svg>
+        </button>
+      </div>
+
+      <section class="issues" id="issues" aria-live="polite"></section>
+
+      <footer class="footnote">
+        <p>Проверка выполняется в браузере. Онлайн-проверка отправляет текст в LanguageTool, ИИ-редактор — выбранному сервису.</p>
+      </footer>
+    </main>
+  </div>
+
+  <dialog class="sheet" id="rewriteDialog" aria-labelledby="rewriteTitle">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <header class="sheet-head">
+      <div>
+        <h2 id="rewriteTitle">ИИ-редактор</h2>
+        <p class="sheet-sub">Перепишет текст и сохранит смысл</p>
+      </div>
+      <button class="icon-btn" data-close type="button" aria-label="Закрыть">
+        <svg><use href="#i-x" /></svg>
+      </button>
+    </header>
+
+    <div class="sheet-body">
+      <div id="aiSetup" class="setup" hidden>
+        <span class="setup-icon"><svg><use href="#i-key" /></svg></span>
+        <h3>Нужен ключ API</h3>
+        <p>ИИ-редактор работает через любой OpenAI-совместимый сервис. Укажите адрес, модель и ключ — они сохранятся только на этом устройстве.</p>
+        <button class="btn primary block" id="aiOpenSettings" type="button">Открыть настройки</button>
+        <p class="hint">Если сервис не разрешает запросы из браузера (CORS), используйте прокси или другой API.</p>
+      </div>
+
+      <div id="aiBody">
+        <h3 class="section-title">Как переписать</h3>
+        <div class="mode-grid" id="modeGrid"></div>
+        <p class="hint">Смысл, факты, имена и цифры сохраняются — меняются только формулировки.</p>
+
+        <button class="btn primary block" id="aiRunBtn" type="button">
+          <svg><use href="#i-sparkles" /></svg>
+          <span id="aiRunLabel">Переписать текст</span>
+        </button>
+
+        <p class="error" id="aiError" hidden></p>
+
+        <div id="aiResult" class="ai-result" hidden>
+          <div class="result-head">
+            <h3 class="section-title">Результат</h3>
+            <button class="btn ghost small" id="diffToggle" type="button">Изменения</button>
+          </div>
+          <p class="hint" id="diffHint" hidden>Красное — удалено, зелёное — добавлено.</p>
+          <div class="result-text" id="resultText"></div>
+          <p class="hint stale-note" id="staleNote" hidden>Текст изменился после переписывания. Запустите заново, чтобы не потерять правки.</p>
+          <div class="result-actions">
+            <button class="btn primary" id="applyResult" type="button">Заменить текст</button>
+            <button class="btn ghost" id="copyResult" type="button">Копировать</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="sheet" id="settingsDialog" aria-labelledby="settingsTitle">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <header class="sheet-head">
+      <div>
+        <h2 id="settingsTitle">Настройки</h2>
+        <p class="sheet-sub">Проверка и ИИ</p>
+      </div>
+      <button class="icon-btn" data-close type="button" aria-label="Закрыть">
+        <svg><use href="#i-x" /></svg>
+      </button>
+    </header>
+
+    <div class="sheet-body">
+      <section class="settings-section">
+        <h3 class="section-title">Проверка</h3>
+
+        <label class="switch-row">
+          <span class="switch-copy">
+            <strong>Онлайн-проверка</strong>
+            <small>Орфография, грамматика и пунктуация через LanguageTool</small>
+          </span>
+          <input type="checkbox" id="optOnline" />
+        </label>
+
+        <label class="switch-row">
+          <span class="switch-copy">
+            <strong>Локальные правила</strong>
+            <small>Пробелы, тире, кавычки, повторы — работают офлайн</small>
+          </span>
+          <input type="checkbox" id="optLocal" />
+        </label>
+
+        <label class="switch-row">
+          <span class="switch-copy">
+            <strong>Проверка Safari</strong>
+            <small>Системные подчёркивания и подсказки iOS</small>
+          </span>
+          <input type="checkbox" id="optNative" />
+        </label>
+
+        <label class="select-row">
+          <span><strong>Язык</strong></span>
+          <select id="optLanguage">
+            <option value="auto">Авто</option>
+            <option value="ru">Русский</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Адрес LanguageTool</span>
+          <input type="url" id="endpoint" inputmode="url" autocapitalize="off" spellcheck="false" />
+          <span class="hint">Публичный API бесплатен, но имеет лимит запросов. Можно указать свой сервер.</span>
+        </label>
+      </section>
+
+      <section class="settings-section">
+        <h3 class="section-title">ИИ-редактор</h3>
+
+        <label class="field">
+          <span class="field-label">Сервис</span>
+          <select id="provider">
+            <option value="openai">OpenAI</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="custom">Свой (прокси)</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Адрес API</span>
+          <input type="url" id="apiBaseURL" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://api.openai.com/v1" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Модель</span>
+          <input type="text" id="apiModel" autocapitalize="off" spellcheck="false" placeholder="gpt-4o-mini" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Ключ API</span>
+          <input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="sk-…" />
+          <span class="hint">Ключ хранится в localStorage этого браузера. Не вводите его на чужих устройствах.</span>
+        </label>
+
+        <button class="btn ghost danger block" id="clearKeyBtn" type="button">Удалить ключ</button>
+      </section>
+
+      <section class="settings-section">
+        <h3 class="section-title">Установка</h3>
+        <p class="hint">На iPhone откройте сайт в Safari → кнопка «Поделиться» → «На экран “Домой”». Приложение запустится без адресной строки и будет работать офлайн.</p>
+        <button class="btn primary block" id="installBtn" type="button" hidden>Установить приложение</button>
+        <p class="hint" id="installedNote" hidden>Приложение уже установлено.</p>
+      </section>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
