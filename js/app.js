@@ -33,7 +33,6 @@ const dom = {
   statusDot: $("statusDot"),
   fixAllBtn: $("fixAllBtn"),
   refreshBtn: $("refreshBtn"),
-  voiceBtn: $("voiceBtn"),
   banner: $("banner"),
   bannerText: $("bannerText"),
   bannerRetry: $("bannerRetry"),
@@ -123,10 +122,6 @@ let autoFixTimer = 0;
 let autoFixBusy = false;
 let correctionSequence = 0;
 let deferredPrompt = null;
-
-const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
-let voiceRecognition = null;
-let voiceListening = false;
 
 // MARK: - Утилиты интерфейса
 
@@ -702,92 +697,6 @@ function clearCorrectionsLog() {
   state.autoFix.passes = 0;
   renderCorrections();
   toast("Журнал очищен");
-}
-
-// MARK: - Голосовой ввод
-
-function toggleVoice() {
-  if (!SpeechRecognitionCtor) {
-    toast("Голосовой ввод не поддерживается. Используйте микрофон на клавиатуре iPhone.");
-    return;
-  }
-
-  if (voiceListening && voiceRecognition) {
-    try { voiceRecognition.stop(); } catch { /* ignore */ }
-    return;
-  }
-
-  const language = state.settings.language === "en"
-    ? "en-US"
-    : state.settings.language === "ru"
-      ? "ru-RU"
-      : detectLanguage(state.text) === "en" ? "en-US" : "ru-RU";
-
-  const recognition = new SpeechRecognitionCtor();
-  voiceRecognition = recognition;
-  recognition.lang = language;
-  recognition.interimResults = false;
-  recognition.continuous = false;
-  recognition.maxAlternatives = 1;
-
-  recognition.onstart = () => {
-    voiceListening = true;
-    dom.voiceBtn.classList.add("recording");
-    toast("Слушаю…");
-  };
-
-  recognition.onresult = (event) => {
-    const transcript = event.results?.[0]?.[0]?.transcript || "";
-    insertVoiceText(transcript);
-  };
-
-  recognition.onerror = (event) => {
-    const reason = event?.error || "";
-    if (reason === "not-allowed" || reason === "service-not-allowed") {
-      toast("Разрешите доступ к микрофону в настройках Safari.");
-    } else if (reason === "no-speech") {
-      toast("Ничего не услышал, попробуйте ещё раз.");
-    } else if (reason !== "aborted") {
-      toast("Не удалось распознать речь.");
-    }
-  };
-
-  recognition.onend = () => {
-    voiceListening = false;
-    voiceRecognition = null;
-    dom.voiceBtn.classList.remove("recording");
-  };
-
-  try {
-    recognition.start();
-  } catch {
-    voiceListening = false;
-    dom.voiceBtn.classList.remove("recording");
-    toast("Не удалось запустить микрофон. Используйте микрофон на клавиатуре iPhone.");
-  }
-}
-
-function insertVoiceText(value) {
-  const text = String(value || "").trim();
-  if (!text) return;
-
-  const start = dom.editor.selectionStart ?? state.text.length;
-  const end = dom.editor.selectionEnd ?? start;
-  const before = state.text.slice(0, start);
-  const after = state.text.slice(end);
-  const leading = before && !/\s$/.test(before) ? " " : "";
-  const trailing = after && !/^\s/.test(after) ? " " : "";
-  const inserted = leading + text + trailing;
-  const next = before + inserted + after;
-
-  setText(next, { focus: true, resetLog: true });
-
-  const position = (before + inserted).length;
-  try {
-    dom.editor.setSelectionRange(position, position);
-  } catch {
-    /* ignore */
-  }
 }
 
 // MARK: - Отрисовка
@@ -1446,7 +1355,6 @@ function bindEvents() {
   dom.editor.addEventListener("scroll", syncHighlightScroll, { passive: true });
 
   dom.pasteBtn.addEventListener("click", pasteText);
-  dom.voiceBtn.addEventListener("click", toggleVoice);
   dom.copyBtn.addEventListener("click", () => copyText(state.text));
   dom.clearBtn.addEventListener("click", clearText);
 
