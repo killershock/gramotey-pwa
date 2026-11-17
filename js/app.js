@@ -25,6 +25,7 @@ const dom = {
   correctionsCount: $("correctionsCount"),
   correctionsList: $("correctionsList"),
   undoCorrections: $("undoCorrections"),
+  clearCorrections: $("clearCorrections"),
   installTip: $("installTip"),
   installTipClose: $("installTipClose"),
   statusText: $("statusText"),
@@ -32,6 +33,7 @@ const dom = {
   statusDot: $("statusDot"),
   fixAllBtn: $("fixAllBtn"),
   refreshBtn: $("refreshBtn"),
+  voiceBtn: $("voiceBtn"),
   banner: $("banner"),
   bannerText: $("bannerText"),
   bannerRetry: $("bannerRetry"),
@@ -50,6 +52,7 @@ const dom = {
   aiSetup: $("aiSetup"),
   aiBody: $("aiBody"),
   aiOpenSettings: $("aiOpenSettings"),
+  rewriteSub: $("rewriteSub"),
   modeGrid: $("modeGrid"),
   aiRunBtn: $("aiRunBtn"),
   aiRunLabel: $("aiRunLabel"),
@@ -71,6 +74,7 @@ const dom = {
   optNative: $("optNative"),
   optLanguage: $("optLanguage"),
   endpoint: $("endpoint"),
+  ignoredWords: $("ignoredWords"),
   provider: $("provider"),
   apiBaseURL: $("apiBaseURL"),
   apiModel: $("apiModel"),
@@ -119,6 +123,10 @@ let autoFixTimer = 0;
 let autoFixBusy = false;
 let correctionSequence = 0;
 let deferredPrompt = null;
+
+const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+let voiceRecognition = null;
+let voiceListening = false;
 
 // MARK: - Утилиты интерфейса
 
@@ -204,8 +212,16 @@ function syncHighlightScroll() {
   dom.hlInner.style.transform = `translateY(${-dom.editor.scrollTop}px)`;
 }
 
-function setText(value, { focus = false } = {}) {
+function setText(value, { focus = false, resetLog = false } = {}) {
   state.text = normalize(value);
+
+  if (resetLog) {
+    state.corrections = [];
+    state.autoFix.undoText = null;
+    state.autoFix.passes = 0;
+    renderCorrections();
+  }
+
   dom.editor.value = state.text;
   state.autoFix.undoText = null;
   state.autoFix.passes = 0;
@@ -219,7 +235,17 @@ function setText(value, { focus = false } = {}) {
 }
 
 function onInput() {
-  state.text = dom.editor.value;
+  const previousText = state.text;
+  const nextText = dom.editor.value;
+
+  if (isFullReplacement(previousText, nextText)) {
+    state.corrections = [];
+    state.autoFix.undoText = null;
+    state.autoFix.passes = 0;
+    renderCorrections();
+  }
+
+  state.text = nextText;
   invalidateOnline();
   state.autoFix.undoText = null;
   state.autoFix.passes = 0;
@@ -231,6 +257,34 @@ function onInput() {
   renderStatus();
   scheduleCheck();
   scheduleAutoFix(1500);
+}
+
+function isFullReplacement(previousText, nextText) {
+  if (!previousText) return false;
+  if (!nextText) return true;
+
+  const minLength = Math.min(previousText.length, nextText.length);
+  if (minLength === 0) return true;
+
+  if (Math.abs(previousText.length - nextText.length) > Math.max(previousText.length, nextText.length) * 0.6) {
+    return true;
+  }
+
+  let prefix = 0;
+  while (prefix < previousText.length && prefix < nextText.length && previousText[prefix] === nextText[prefix]) {
+    prefix += 1;
+  }
+
+  let suffix = 0;
+  while (
+    suffix < previousText.length - prefix &&
+    suffix < nextText.length - prefix &&
+    previousText[previousText.length - 1 - suffix] === nextText[nextText.length - 1 - suffix]
+  ) {
+    suffix += 1;
+  }
+
+  return prefix + suffix < minLength * 0.2;
 }
 
 function invalidateOnline() {
@@ -254,7 +308,7 @@ async function pasteText() {
       toast("В буфере обмена пусто");
       return;
     }
-    setText(state.text ? `${state.text}\n${value}` : value);
+    setText(state.text ? `${state.text}\n${value}` : value, { resetLog: true });
     toast("Вставлено");
   } catch {
     dom.editor.focus();
@@ -401,7 +455,7 @@ async function fetchOnlineCheck() {
     if (token !== state.onlineToken) return;
     if (state.text !== text) return;
 
-    state.onlineIssues = matchesToIssues(matches, payload);
+    state.onlineIssues = matchesToIssues(matches, payload, state.settings.ignoredWords);
     state.onlineText = text;
     state.onlineStatus = "ok";
     state.onlineError = "";
@@ -444,19 +498,27 @@ function mergeIssues(local, online) {
     });
   });
 
-  const combined = [...local, ...meaningfulOnline];
-  combined.sort((lhs, rhs) => {
+  const byPosition = (lhs, rhs) => {
     if (lhs.start !== rhs.start) return lhs.start - rhs.start;
     return (rhs.end - rhs.start) - (lhs.end - lhs.start);
+  };
+
+  // Локальные правила точнее в пробелах и частых запятых, поэтому занимают
+  // место первыми, а пересекающиеся онлайн-подсказки отбрасываем.
+  const kept = [];
+  const accept = (issue) => {
+    if (kept.some((existing) => rangesOverlap(existing, issue))) return;
+    kept.push(issue);
+  };
+
+  [...local].sort(byPosition).forEach(accept);
+  [...meaningfulOnline].sort(byPosition).forEach((issue) => {
+    if (kept.length >= 400) return;
+    accept(issue);
   });
 
-  const kept = [];
-  for (const issue of combined) {
-    if (kept.some((existing) => rangesOverlap(existing, issue))) continue;
-    kept.push(issue);
-    if (kept.length >= 400) break;
-  }
-  return kept;
+  kept.sort(byPosition);
+  return kept.slice(0, 400);
 }
 
 function rangesOverlap(lhs, rhs) {
@@ -492,6 +554,7 @@ function maybeAutoFix() {
   const allowOnline = Boolean(state.settings.autoFixSpelling);
   const applicable = state.issues
     .filter((issue) => issue.suggestions.length > 0)
+    .filter((issue) => issue.autoFixable !== false)
     .filter((issue) => allowOnline || issue.source === "local")
     .filter((issue) => issue.end <= state.text.length)
     .filter((issue) => issue.insertion || state.text.slice(issue.start, issue.end) === issue.original)
@@ -631,6 +694,100 @@ function undoAutoFix() {
   renderCorrections();
   runCheckNow(0);
   toast("Изменения отменены");
+}
+
+function clearCorrectionsLog() {
+  state.corrections = [];
+  state.autoFix.undoText = null;
+  state.autoFix.passes = 0;
+  renderCorrections();
+  toast("Журнал очищен");
+}
+
+// MARK: - Голосовой ввод
+
+function toggleVoice() {
+  if (!SpeechRecognitionCtor) {
+    toast("Голосовой ввод не поддерживается. Используйте микрофон на клавиатуре iPhone.");
+    return;
+  }
+
+  if (voiceListening && voiceRecognition) {
+    try { voiceRecognition.stop(); } catch { /* ignore */ }
+    return;
+  }
+
+  const language = state.settings.language === "en"
+    ? "en-US"
+    : state.settings.language === "ru"
+      ? "ru-RU"
+      : detectLanguage(state.text) === "en" ? "en-US" : "ru-RU";
+
+  const recognition = new SpeechRecognitionCtor();
+  voiceRecognition = recognition;
+  recognition.lang = language;
+  recognition.interimResults = false;
+  recognition.continuous = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    voiceListening = true;
+    dom.voiceBtn.classList.add("recording");
+    toast("Слушаю…");
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = event.results?.[0]?.[0]?.transcript || "";
+    insertVoiceText(transcript);
+  };
+
+  recognition.onerror = (event) => {
+    const reason = event?.error || "";
+    if (reason === "not-allowed" || reason === "service-not-allowed") {
+      toast("Разрешите доступ к микрофону в настройках Safari.");
+    } else if (reason === "no-speech") {
+      toast("Ничего не услышал, попробуйте ещё раз.");
+    } else if (reason !== "aborted") {
+      toast("Не удалось распознать речь.");
+    }
+  };
+
+  recognition.onend = () => {
+    voiceListening = false;
+    voiceRecognition = null;
+    dom.voiceBtn.classList.remove("recording");
+  };
+
+  try {
+    recognition.start();
+  } catch {
+    voiceListening = false;
+    dom.voiceBtn.classList.remove("recording");
+    toast("Не удалось запустить микрофон. Используйте микрофон на клавиатуре iPhone.");
+  }
+}
+
+function insertVoiceText(value) {
+  const text = String(value || "").trim();
+  if (!text) return;
+
+  const start = dom.editor.selectionStart ?? state.text.length;
+  const end = dom.editor.selectionEnd ?? start;
+  const before = state.text.slice(0, start);
+  const after = state.text.slice(end);
+  const leading = before && !/\s$/.test(before) ? " " : "";
+  const trailing = after && !/^\s/.test(after) ? " " : "";
+  const inserted = leading + text + trailing;
+  const next = before + inserted + after;
+
+  setText(next, { focus: true, resetLog: true });
+
+  const position = (before + inserted).length;
+  try {
+    dom.editor.setSelectionRange(position, position);
+  } catch {
+    /* ignore */
+  }
 }
 
 // MARK: - Отрисовка
@@ -982,6 +1139,10 @@ function renderRewrite() {
   renderModeGrid();
 
   const isTranslate = state.ai.mode === "translate";
+  const isPunctuation = state.ai.mode === "punctuation";
+  dom.rewriteSub.textContent = isPunctuation
+    ? "Расставит знаки, не меняя слова"
+    : "Перепишет текст и сохранит смысл";
   dom.translateField.hidden = !isTranslate;
   if (isTranslate) {
     dom.targetLanguage.value = state.ai.targetLanguage;
@@ -989,8 +1150,8 @@ function renderRewrite() {
 
   dom.aiRunBtn.disabled = state.ai.busy || !state.text.trim();
   dom.aiRunLabel.textContent = state.ai.busy
-    ? (isTranslate ? "Перевожу…" : "Переписываю…")
-    : (isTranslate ? "Перевести текст" : "Переписать текст");
+    ? (isPunctuation ? "Ставлю запятые…" : (isTranslate ? "Перевожу…" : "Переписываю…"))
+    : (isPunctuation ? "Поставить запятые" : (isTranslate ? "Перевести текст" : "Переписать текст"));
 
   dom.aiError.hidden = !state.ai.error;
   dom.aiError.textContent = state.ai.error || "";
@@ -1088,7 +1249,7 @@ function applyAIResult() {
     return;
   }
 
-  setText(state.ai.result, { focus: true });
+  setText(state.ai.result, { focus: true, resetLog: true });
   closeDialog(dom.rewriteDialog);
   toast("Текст заменён");
 }
@@ -1107,6 +1268,7 @@ function syncSettingsUI() {
   dom.optNative.checked = state.settings.nativeSpellcheck;
   dom.optLanguage.value = state.settings.language;
   dom.endpoint.value = state.settings.endpoint;
+  dom.ignoredWords.value = (state.settings.ignoredWords || []).join("\n");
   dom.provider.value = PROVIDERS[state.settings.provider] ? state.settings.provider : "custom";
   dom.apiBaseURL.value = state.settings.apiBaseURL;
   dom.apiModel.value = state.settings.apiModel;
@@ -1164,6 +1326,17 @@ function bindSettings() {
     persistSettings();
     runCheckNow(800);
   }, 700));
+
+  dom.ignoredWords.addEventListener("input", debounce(() => {
+    const words = dom.ignoredWords.value
+      .split(/[\n,;]+/)
+      .map((word) => word.trim())
+      .filter(Boolean);
+
+    state.settings.ignoredWords = Array.from(new Set(words));
+    persistSettings();
+    runCheckNow(0);
+  }, 600));
 
   dom.provider.addEventListener("change", () => {
     const id = dom.provider.value;
@@ -1273,6 +1446,7 @@ function bindEvents() {
   dom.editor.addEventListener("scroll", syncHighlightScroll, { passive: true });
 
   dom.pasteBtn.addEventListener("click", pasteText);
+  dom.voiceBtn.addEventListener("click", toggleVoice);
   dom.copyBtn.addEventListener("click", () => copyText(state.text));
   dom.clearBtn.addEventListener("click", clearText);
 
@@ -1290,6 +1464,7 @@ function bindEvents() {
   });
 
   dom.undoCorrections.addEventListener("click", undoAutoFix);
+  dom.clearCorrections.addEventListener("click", clearCorrectionsLog);
 
   dom.settingsBtn.addEventListener("click", () => {
     syncSettingsUI();
@@ -1358,6 +1533,7 @@ function init() {
 
   if (typeof state.settings.autoFix !== "boolean") state.settings.autoFix = true;
   if (typeof state.settings.autoFixSpelling !== "boolean") state.settings.autoFixSpelling = true;
+  if (!Array.isArray(state.settings.ignoredWords)) state.settings.ignoredWords = [];
 
   state.text = normalize(loadDraft());
   dom.editor.value = state.text;

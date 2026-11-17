@@ -1,5 +1,6 @@
 export const REWRITE_MODES = [
   { id: "polish", title: "Исправить", subtitle: "Ошибки и аккуратная правка, сохранить голос", icon: "i-check" },
+  { id: "punctuation", title: "Запятые", subtitle: "Только знаки, слова не трогаем", icon: "i-pen" },
   { id: "translate", title: "Перевести", subtitle: "На другой язык, сохранив смысл", icon: "i-globe" },
   { id: "formal", title: "Официально", subtitle: "Деловой и нейтральный тон", icon: "i-briefcase" },
   { id: "concise", title: "Короче", subtitle: "Убрать воду и повторы", icon: "i-scissors" },
@@ -27,6 +28,7 @@ export const PROVIDERS = {
 
 const MODE_INSTRUCTIONS = {
   polish: "Исправь орфографию, пунктуацию и грамматику. Сделай текст аккуратным, сохранив авторский голос, порядок мыслей и все детали.",
+  punctuation: "Расставь только знаки препинания: запятые, точки, тире, двоеточия, кавычки и пробелы после знаков. Не меняй и не переставляй ни одного слова, не сокращай и не добавляй текст. Если сомневаешься — оставь как есть.",
   formal: "Перепиши текст в официально-деловом стиле: нейтрально, вежливо, без разговорных выражений. Смысл и факты сохрани полностью.",
   simple: "Упрости формулировки: разбей длинные предложения, замени сложные слова понятными. Смысл, имена, числа и факты сохрани.",
   concise: "Сократи текст, убери повторы и воду. Сохрани все важные детали, факты, имена и числа. Не добавляй ничего нового.",
@@ -56,6 +58,15 @@ const SYSTEM_PROMPT = `Ты — профессиональный редакто�
 5. Не используй markdown, не добавляй пояснения, заголовки и кавычки вокруг ответа.
 Возвращай только итоговый текст.`;
 
+const PUNCTUATION_PROMPT = `Ты — корректор пунктуации. Твоя задача — только расставить пропущенные знаки препинания и убрать лишние, а также привести в порядок пробелы вокруг знаков.
+Строгие правила:
+1. Не меняй, не добавляй и не удаляй ни одного слова. Орфографию тоже не исправляй.
+2. Не меняй порядок слов, регистр букв (кроме заглавной после точки), переносы строк и абзацы.
+3. Не перефразируй, не сокращай и ничего не объясняй.
+4. Если знак вызывает сомнение — оставь текст как есть.
+5. Не используй markdown и не добавляй кавычки вокруг ответа.
+Возвращай только итоговый текст.`;
+
 export async function rewriteText({ text, mode, targetLanguage, settings }) {
   const source = text.trim();
   if (!source) throw new AIError("Сначала добавьте текст.", "empty");
@@ -70,16 +81,30 @@ export async function rewriteText({ text, mode, targetLanguage, settings }) {
   if (!model) throw new AIError("Укажите модель в настройках.", "config");
 
   const isTranslate = mode === "translate";
+  const isPunctuation = mode === "punctuation";
   const instruction = isTranslate
     ? `Переведи текст на ${targetLanguage || "русский"}. Сохрани смысл, имена, числа, ссылки и структуру абзацев. Верни только перевод.`
     : (MODE_INSTRUCTIONS[mode] || MODE_INSTRUCTIONS.polish);
 
-  const systemContent = isTranslate
-    ? SYSTEM_PROMPT.replace(
-        "4. Не меняй язык текста.",
-        "4. Переведи текст на язык, указанный в задании."
-      )
-    : SYSTEM_PROMPT;
+  let systemContent;
+  if (isPunctuation) {
+    systemContent = PUNCTUATION_PROMPT;
+  } else if (isTranslate) {
+    systemContent = SYSTEM_PROMPT.replace(
+      "4. Не меняй язык текста.",
+      "4. Переведи текст на язык, указанный в задании."
+    );
+  } else {
+    systemContent = SYSTEM_PROMPT;
+  }
+
+  const ignoredWords = Array.isArray(settings.ignoredWords)
+    ? settings.ignoredWords.map((word) => String(word).trim()).filter(Boolean)
+    : [];
+
+  if (ignoredWords.length > 0) {
+    systemContent += `\nСохраняй без изменений следующие слова и названия: ${ignoredWords.join(", ")}.`;
+  }
 
   const body = {
     model,
@@ -88,7 +113,7 @@ export async function rewriteText({ text, mode, targetLanguage, settings }) {
       { role: "system", content: systemContent },
       {
         role: "user",
-        content: isTranslate
+        content: isTranslate || isPunctuation
           ? `Задача: ${instruction}\n\nТекст:\n${source}`
           : `Режим: ${instruction}\n\nЕсли текст уже корректен, верни его без изменений.\n\nТекст:\n${source}`
       }

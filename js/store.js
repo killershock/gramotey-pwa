@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS = {
   nativeSpellcheck: false,
   language: "auto",
   endpoint: "https://api.languagetool.org/v2/check",
+  ignoredWords: [],
   provider: "gemini",
   apiBaseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
   apiModel: "gemini-3.5-flash-lite",

@@ -460,6 +460,21 @@ svg {
   color: var(--danger);
 }
 
+.text-btn.recording {
+  color: var(--danger);
+  background: rgba(220, 38, 38, 0.1);
+  animation: pulse-mic 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-mic {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
+  }
+}
+
 /* MARK: - Строка состояния */
 
 .statusbar {
@@ -777,6 +792,12 @@ svg {
   justify-content: space-between;
   gap: 10px;
   padding: 4px 2px;
+}
+
+.corrections-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .corrections-head h2 {
@@ -1289,6 +1310,7 @@ svg {
 
 .field input,
 .field select,
+.field textarea,
 .select-row select {
   width: 100%;
   padding: 10px 12px;
@@ -1301,8 +1323,15 @@ svg {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.field textarea {
+  min-height: 82px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
 .field input:focus,
 .field select:focus,
+.field textarea:focus,
 .select-row select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);

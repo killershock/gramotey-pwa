@@ -3,6 +3,10 @@ import { isProtectedWord } from "./protected.js";
 export const DEFAULT_ENDPOINT = "https://api.languagetool.org/v2/check";
 export const MAX_ONLINE_CHARS = 18000;
 
+// Правила LanguageTool, которые на проверенных фразах дают заведомо неверные
+// подсказки. Verb_comma_Verb, например, предлагает «сказал чтобы я, пришел».
+const BLOCKED_RULES = new Set(["Verb_comma_Verb"]);
+
 export class OnlineCheckError extends Error {
   constructor(message, code = "error") {
     super(message);
@@ -64,11 +68,12 @@ export async function checkWithLanguageTool(text, { language = "auto", endpoint 
   };
 }
 
-export function matchesToIssues(matches, text) {
+export function matchesToIssues(matches, text, ignoredWords = []) {
   const issues = [];
 
   for (const match of matches) {
     if (!match || typeof match.offset !== "number" || typeof match.length !== "number") continue;
+    if (match.rule && BLOCKED_RULES.has(match.rule.id)) continue;
 
     const start = match.offset;
     const end = start + match.length;
@@ -77,9 +82,11 @@ export function matchesToIssues(matches, text) {
     const original = text.slice(start, end);
     // Мат и сленг не проверяем: иначе «бля» предлагают заменить на «Юля»/«для»/«Оля».
     if (isProtectedWord(original)) continue;
+    if (isIgnored(original, ignoredWords)) continue;
 
-    const replacements = Array.isArray(match.replacements) ? match.replacements : [];
-    const suggestions = replacements
+    const kind = kindForRule(match.rule);
+    const replacementValues = Array.isArray(match.replacements) ? match.replacements : [];
+    const suggestions = replacementValues
       .map((item) => (item && typeof item.value === "string" ? item.value : null))
       .filter((value) => value !== null)
       .slice(0, 4)
@@ -87,14 +94,18 @@ export function matchesToIssues(matches, text) {
 
     issues.push({
       id: `lt-${start}-${end}-${match.rule?.id || "rule"}-${issues.length}`,
-      kind: kindForRule(match.rule),
+      kind,
       start,
       end,
       original: text.slice(start, end),
       insertion: match.length === 0,
       message: match.message || match.shortMessage || "Возможная ошибка.",
       suggestions,
-      source: "lt"
+      source: "lt",
+      // Автоматически применяем только безопасные типы: орфографию, пробелы,
+      // регистр и повторы. Грамматику и знаки препинания от LanguageTool
+      // оставляем карточкой — в русском правила иногда ошибаются.
+      autoFixable: isSafeOnlineKind(kind)
     });
   }
 
@@ -114,4 +125,33 @@ function kindForRule(rule = {}) {
   if (category === "GRAMMAR" || type === "grammar") return "grammar";
   if (type === "uncategorized") return "grammar";
   return "punctuation";
+}
+
+function isSafeOnlineKind(kind) {
+  return kind === "spelling" || kind === "spacing" || kind === "casing" || kind === "duplicate";
+}
+
+function normalizeForCompare(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isIgnored(value, ignoredWords) {
+  if (!Array.isArray(ignoredWords) || ignoredWords.length === 0) return false;
+
+  const normalized = normalizeForCompare(value);
+  if (!normalized) return false;
+
+  for (const raw of ignoredWords) {
+    const word = normalizeForCompare(raw);
+    if (!word) continue;
+    if (normalized === word) return true;
+    if (word.includes(" ") && normalized.includes(word)) return true;
+  }
+
+  return false;
 }
