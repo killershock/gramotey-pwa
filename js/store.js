@@ -2,6 +2,8 @@ const SETTINGS_KEY = "gramotey.settings.v1";
 const DRAFT_KEY = "gramotey.draft.v1";
 
 export const DEFAULT_SETTINGS = {
+  theme: "system",
+  customThemes: [],
   onlineCheck: true,
   localRules: true,
   autoFix: true,

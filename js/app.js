@@ -9,6 +9,14 @@ import {
 import { rewriteText, REWRITE_MODES, PROVIDERS } from "./ai.js";
 import { diffTokens } from "./diff.js";
 import { loadSettings, saveSettings, loadDraft, saveDraft, clearDraft } from "./store.js";
+import {
+  PRESETS,
+  CUSTOM_DEFAULTS,
+  applyTheme,
+  customVars,
+  contrastRatio,
+  onColor
+} from "./theme.js";
 import { debounce, escapeHtml, detectLanguage, formatCount } from "./utils.js";
 
 // MARK: - Ссылки на элементы
@@ -80,7 +88,22 @@ const dom = {
   apiKey: $("apiKey"),
   clearKeyBtn: $("clearKeyBtn"),
   installBtn: $("installBtn"),
-  installedNote: $("installedNote")
+  installedNote: $("installedNote"),
+
+  themeGrid: $("themeGrid"),
+  themeMaker: $("themeMaker"),
+  themeName: $("themeName"),
+  themeBg: $("themeBg"),
+  themeSurface: $("themeSurface"),
+  themeText: $("themeText"),
+  themeAccent: $("themeAccent"),
+  themePreview: $("themePreview"),
+  themePreviewTitle: $("themePreviewTitle"),
+  themePreviewText: $("themePreviewText"),
+  themePreviewBtn: $("themePreviewBtn"),
+  themeHint: $("themeHint"),
+  themeSaveBtn: $("themeSaveBtn"),
+  themeResetBtn: $("themeResetBtn")
 };
 
 // MARK: - Состояние
@@ -112,7 +135,8 @@ const state = {
     original: "",
     error: "",
     showDiff: false
-  }
+  },
+  themeEditing: null
 };
 
 let localTimer = 0;
@@ -1169,6 +1193,261 @@ function persistSettings() {
   saveSettings(state.settings);
 }
 
+// MARK: - Темы
+
+function customThemeList() {
+  return Array.isArray(state.settings.customThemes) ? state.settings.customThemes : [];
+}
+
+function activeThemeId() {
+  return state.settings.theme || "system";
+}
+
+function newThemeId() {
+  return "custom-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function colorValue(value, fallback) {
+  return /^#[0-9a-f]{6}$/i.test(String(value || "")) ? String(value) : fallback;
+}
+
+function swatchHtml(colors) {
+  return `<span class="theme-swatch">${colors
+    .map((color) => `<i style="background:${escapeHtml(color)}"></i>`)
+    .join("")}</span>`;
+}
+
+function themeLabel(id) {
+  const preset = PRESETS.find((item) => item.id === id);
+  if (preset) return preset.name;
+  const custom = customThemeList().find((item) => item.id === id);
+  return custom ? custom.name || CUSTOM_DEFAULTS.name : CUSTOM_DEFAULTS.name;
+}
+
+function renderThemeGrid() {
+  if (!dom.themeGrid) return;
+
+  const active = activeThemeId();
+  const presetSwatches = {
+    system: ["#f2f4f9", "#0c111b", "#2f66d0"],
+    light: ["#f2f4f9", "#ffffff", "#2f66d0"],
+    dark: ["#0c111b", "#151d2c", "#6f9bf2"]
+  };
+
+  const cards = [];
+
+  for (const preset of PRESETS) {
+    cards.push(`
+      <div class="theme-card" role="button" tabindex="0" data-theme-id="${preset.id}"
+           aria-pressed="${preset.id === active ? "true" : "false"}">
+        ${swatchHtml(presetSwatches[preset.id] || presetSwatches.light)}
+        <span class="theme-card-name">${escapeHtml(preset.name)}</span>
+        ${preset.hint ? `<span class="theme-card-hint">${escapeHtml(preset.hint)}</span>` : ""}
+      </div>`);
+  }
+
+  for (const theme of customThemeList()) {
+    const id = escapeHtml(theme.id);
+    const name = escapeHtml(theme.name || CUSTOM_DEFAULTS.name);
+    cards.push(`
+      <div class="theme-card" role="button" tabindex="0" data-theme-id="${id}"
+           aria-pressed="${theme.id === active ? "true" : "false"}">
+        ${swatchHtml([
+          colorValue(theme.bg, CUSTOM_DEFAULTS.bg),
+          colorValue(theme.surface, CUSTOM_DEFAULTS.surface),
+          colorValue(theme.accent, CUSTOM_DEFAULTS.accent)
+        ])}
+        <span class="theme-card-name">${name}</span>
+        <span class="theme-card-tools">
+          <button class="theme-tool" type="button" data-theme-edit="${id}" aria-label="Изменить тему ${name}" title="Изменить">✎</button>
+          <button class="theme-tool" type="button" data-theme-remove="${id}" aria-label="Удалить тему ${name}" title="Удалить">✕</button>
+        </span>
+      </div>`);
+  }
+
+  dom.themeGrid.innerHTML = cards.join("");
+}
+
+function applyThemeNow() {
+  return applyTheme(state.settings);
+}
+
+function selectTheme(id) {
+  if (activeThemeId() === id) return;
+  state.settings.theme = id;
+  persistSettings();
+  applyThemeNow();
+  renderThemeGrid();
+  toast(`Тема: ${themeLabel(id)}`);
+}
+
+function fillThemeForm(theme) {
+  if (!dom.themeName) return;
+
+  const source = theme || CUSTOM_DEFAULTS;
+  dom.themeName.value = theme ? source.name || "" : "";
+  dom.themeBg.value = colorValue(source.bg, CUSTOM_DEFAULTS.bg);
+  dom.themeSurface.value = colorValue(source.surface, CUSTOM_DEFAULTS.surface);
+  dom.themeText.value = colorValue(source.text, CUSTOM_DEFAULTS.text);
+  dom.themeAccent.value = colorValue(source.accent, CUSTOM_DEFAULTS.accent);
+
+  dom.themeSaveBtn.textContent = state.themeEditing ? "Сохранить изменения" : "Сохранить тему";
+  dom.themeResetBtn.hidden = !state.themeEditing;
+  updateThemePreview();
+}
+
+function readThemeForm() {
+  return {
+    name: (dom.themeName.value || "").trim().slice(0, 24),
+    bg: colorValue(dom.themeBg.value, CUSTOM_DEFAULTS.bg),
+    surface: colorValue(dom.themeSurface.value, CUSTOM_DEFAULTS.surface),
+    text: colorValue(dom.themeText.value, CUSTOM_DEFAULTS.text),
+    accent: colorValue(dom.themeAccent.value, CUSTOM_DEFAULTS.accent)
+  };
+}
+
+function updateThemePreview() {
+  if (!dom.themePreview) return;
+
+  const theme = readThemeForm();
+  const vars = customVars(theme);
+
+  dom.themePreview.style.background = vars["--bg"];
+  dom.themePreview.style.borderColor = vars["--line"];
+  dom.themePreviewTitle.style.color = vars["--text"];
+  dom.themePreviewText.style.color = vars["--muted"];
+  dom.themePreviewBtn.style.background = vars["--accent"];
+  dom.themePreviewBtn.style.color = onColor(theme.accent);
+
+  const ratio = contrastRatio(theme.text, theme.bg);
+  if (ratio < 3) {
+    dom.themeHint.hidden = false;
+    dom.themeHint.textContent = `Текст на фоне читается плохо (контраст ${ratio.toFixed(1)}:1). Сделайте фон светлее или текст темнее.`;
+  } else {
+    dom.themeHint.hidden = true;
+  }
+}
+
+function saveTheme() {
+  const form = readThemeForm();
+  const theme = { ...form, name: form.name || CUSTOM_DEFAULTS.name };
+
+  const list = customThemeList().slice();
+  const editingId = state.themeEditing;
+  let savedId = editingId;
+
+  if (editingId) {
+    const index = list.findIndex((item) => item.id === editingId);
+    if (index >= 0) {
+      list[index] = { ...list[index], ...theme };
+    } else {
+      savedId = newThemeId();
+      list.push({ id: savedId, ...theme });
+    }
+  } else {
+    savedId = newThemeId();
+    list.push({ id: savedId, ...theme });
+  }
+
+  state.settings.customThemes = list;
+  state.settings.theme = savedId;
+  state.themeEditing = null;
+
+  persistSettings();
+  applyThemeNow();
+  renderThemeGrid();
+  fillThemeForm(null);
+  dom.themeMaker.open = false;
+  toast("Тема сохранена и применена");
+}
+
+function startEditTheme(id) {
+  const theme = customThemeList().find((item) => item.id === id);
+  if (!theme) return;
+
+  state.themeEditing = id;
+  fillThemeForm(theme);
+  dom.themeMaker.open = true;
+  dom.themeMaker.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  dom.themeName.focus();
+}
+
+function removeTheme(id) {
+  const theme = customThemeList().find((item) => item.id === id);
+  if (!theme) return;
+
+  const name = theme.name || CUSTOM_DEFAULTS.name;
+  if (!window.confirm(`Удалить тему «${name}»?`)) return;
+
+  state.settings.customThemes = customThemeList().filter((item) => item.id !== id);
+  if (state.settings.theme === id) state.settings.theme = "system";
+  if (state.themeEditing === id) {
+    state.themeEditing = null;
+    fillThemeForm(null);
+  }
+
+  persistSettings();
+  applyThemeNow();
+  renderThemeGrid();
+  toast("Тема удалена");
+}
+
+function bindTheme() {
+  if (!dom.themeGrid) return;
+
+  dom.themeGrid.addEventListener("click", (event) => {
+    const edit = event.target.closest("[data-theme-edit]");
+    if (edit) {
+      startEditTheme(edit.dataset.themeEdit);
+      return;
+    }
+
+    const remove = event.target.closest("[data-theme-remove]");
+    if (remove) {
+      removeTheme(remove.dataset.themeRemove);
+      return;
+    }
+
+    const card = event.target.closest("[data-theme-id]");
+    if (card) selectTheme(card.dataset.themeId);
+  });
+
+  dom.themeGrid.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const card = event.target.closest("[data-theme-id]");
+    if (!card || event.target !== card) return;
+    event.preventDefault();
+    selectTheme(card.dataset.themeId);
+  });
+
+  [dom.themeBg, dom.themeSurface, dom.themeText, dom.themeAccent].forEach((input) => {
+    input.addEventListener("input", updateThemePreview);
+    input.addEventListener("change", updateThemePreview);
+  });
+
+  dom.themeSaveBtn.addEventListener("click", saveTheme);
+
+  dom.themeResetBtn.addEventListener("click", () => {
+    state.themeEditing = null;
+    fillThemeForm(null);
+    dom.themeMaker.open = true;
+    dom.themeName.focus();
+  });
+}
+
+function watchSystemTheme() {
+  try {
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => {
+      if (activeThemeId() === "system") applyThemeNow();
+    };
+    if (query.addEventListener) query.addEventListener("change", handler);
+    else if (query.addListener) query.addListener(handler);
+  } catch {
+    /* без matchMedia тема просто не следит за системой */
+  }
+}
+
 function syncSettingsUI() {
   dom.optOnline.checked = state.settings.onlineCheck;
   dom.optLocal.checked = state.settings.localRules;
@@ -1183,6 +1462,7 @@ function syncSettingsUI() {
   dom.apiModel.value = state.settings.apiModel;
   dom.apiKey.value = state.settings.apiKey;
   dom.editor.spellcheck = state.settings.nativeSpellcheck;
+  renderThemeGrid();
 }
 
 function bindSettings() {
@@ -1442,13 +1722,24 @@ function init() {
   if (typeof state.settings.autoFix !== "boolean") state.settings.autoFix = true;
   if (typeof state.settings.autoFixSpelling !== "boolean") state.settings.autoFixSpelling = true;
   if (!Array.isArray(state.settings.ignoredWords)) state.settings.ignoredWords = [];
+  if (!Array.isArray(state.settings.customThemes)) state.settings.customThemes = [];
+  if (typeof state.settings.theme !== "string") state.settings.theme = "system";
+  if (state.settings.theme !== "system" && state.settings.theme !== "light" && state.settings.theme !== "dark") {
+    const exists = state.settings.customThemes.some((item) => item && item.id === state.settings.theme);
+    if (!exists) state.settings.theme = "system";
+  }
+
+  applyThemeNow();
+  watchSystemTheme();
 
   state.text = normalize(loadDraft());
   dom.editor.value = state.text;
 
   syncSettingsUI();
+  fillThemeForm(null);
   bindEvents();
   bindSettings();
+  bindTheme();
   setupInstall();
   setupInstallTip();
   registerServiceWorker();

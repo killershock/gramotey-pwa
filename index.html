@@ -14,6 +14,54 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Грамотей" />
+  <script>
+    // Тема применяется до отрисовки, чтобы не было вспышки белым.
+    // Кеш пишет js/theme.js при каждом применении темы.
+    (function () {
+      try {
+        var root = document.documentElement;
+        var cached = null;
+        try {
+          cached = JSON.parse(localStorage.getItem("gramotey.theme.v1") || "null");
+        } catch (e) {
+          cached = null;
+        }
+
+        var mode = cached && cached.mode;
+        if (!mode) {
+          var settings = {};
+          try {
+            settings = JSON.parse(localStorage.getItem("gramotey.settings.v1") || "{}") || {};
+          } catch (e) {
+            settings = {};
+          }
+          var id = settings.theme || "system";
+          var systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          if (id === "light" || id === "dark") mode = id;
+          else if (id === "custom") mode = systemDark ? "dark" : "light"; // цвета подставит app.js
+          else mode = systemDark ? "dark" : "light";
+        }
+
+        root.setAttribute("data-theme", mode);
+
+        if (cached && cached.vars) {
+          for (var key in cached.vars) {
+            if (Object.prototype.hasOwnProperty.call(cached.vars, key)) {
+              root.style.setProperty(key, cached.vars[key]);
+            }
+          }
+        }
+        if (cached && cached.colorScheme) root.style.colorScheme = cached.colorScheme;
+
+        if (cached && cached.metaColor) {
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", cached.metaColor);
+        }
+      } catch (e) {
+        /* тема — не повод ломать приложение */
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="./css/styles.css" />
 </head>
 <body>
@@ -311,7 +359,7 @@
     <header class="sheet-head">
       <div>
         <h2 id="settingsTitle">Настройки</h2>
-        <p class="sheet-sub">Проверка и ИИ</p>
+        <p class="sheet-sub">Тема, проверка и ИИ</p>
       </div>
       <button class="icon-btn" data-close type="button" aria-label="Закрыть">
         <svg><use href="#i-x" /></svg>
@@ -319,6 +367,54 @@
     </header>
 
     <div class="sheet-body">
+      <section class="settings-section">
+        <h3 class="section-title">Тема</h3>
+        <p class="hint">Выберите готовую тему или создайте свою: задайте цвета и название.</p>
+        <div class="theme-grid" id="themeGrid" role="group" aria-label="Темы"></div>
+
+        <details class="theme-maker" id="themeMaker">
+          <summary>Создать свою тему</summary>
+          <div class="theme-form">
+            <label class="field">
+              <span class="field-label">Название</span>
+              <input type="text" id="themeName" maxlength="24" autocomplete="off" placeholder="Например, «Сепия»" />
+            </label>
+
+            <div class="theme-colors">
+              <label class="color-field">
+                <span>Фон</span>
+                <input type="color" id="themeBg" value="#f2f4f9" />
+              </label>
+              <label class="color-field">
+                <span>Панели</span>
+                <input type="color" id="themeSurface" value="#ffffff" />
+              </label>
+              <label class="color-field">
+                <span>Текст</span>
+                <input type="color" id="themeText" value="#131a2a" />
+              </label>
+              <label class="color-field">
+                <span>Акцент</span>
+                <input type="color" id="themeAccent" value="#2f66d0" />
+              </label>
+            </div>
+
+            <div class="theme-preview" id="themePreview">
+              <p class="theme-preview-title" id="themePreviewTitle">Так выглядит текст</p>
+              <p class="theme-preview-text" id="themePreviewText">Подсказка и второстепенный текст</p>
+              <span class="theme-preview-btn" id="themePreviewBtn">Кнопка</span>
+            </div>
+
+            <p class="hint" id="themeHint" hidden></p>
+
+            <div class="theme-actions">
+              <button class="btn primary block" id="themeSaveBtn" type="button">Сохранить тему</button>
+              <button class="btn ghost block" id="themeResetBtn" type="button" hidden>Новая тема</button>
+            </div>
+          </div>
+        </details>
+      </section>
+
       <section class="settings-section">
         <h3 class="section-title">Проверка</h3>
 
@@ -426,7 +522,7 @@
         <p class="hint">На iPhone откройте сайт в Safari → кнопка «Поделиться» → «На экран “Домой”». Приложение запустится без адресной строки и будет работать офлайн.</p>
         <button class="btn primary block" id="installBtn" type="button" hidden>Установить приложение</button>
         <p class="hint" id="installedNote" hidden>Приложение уже установлено.</p>
-        <p class="hint">Версия 1.3.1</p>
+        <p class="hint">Версия 1.4.0</p>
       </section>
     </div>
   </dialog>

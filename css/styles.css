@@ -1,7 +1,7 @@
 /* Грамотей — PWA */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --bg: #f2f4f9;
   --bg-translucent: rgba(242, 244, 249, 0.88);
@@ -23,26 +23,28 @@
   --shadow-lg: 0 24px 70px rgba(10, 18, 40, 0.22);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0c111b;
-    --bg-translucent: rgba(12, 17, 27, 0.88);
-    --bg-elev: #151d2c;
-    --bg-soft: #1b2436;
-    --text: #e8ecf6;
-    --muted: #9aa6bd;
-    --muted-2: #6f7b91;
-    --line: rgba(232, 236, 246, 0.1);
-    --accent: #6f9bf2;
-    --accent-strong: #8fb2f7;
-    --accent-soft: rgba(111, 155, 242, 0.16);
-    --ok: #34d399;
-    --warn: #fbbf24;
-    --danger: #f87171;
-    --switch-bg: #33405a;
-    --shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 30px 80px rgba(0, 0, 0, 0.55);
-  }
+/* Тёмная тема включается атрибутом data-theme на <html>: так её можно
+   переключать вручную, а не только вслед за системой.
+   Тема «как на устройстве» тоже ставит этот атрибут — из js/theme.js. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0c111b;
+  --bg-translucent: rgba(12, 17, 27, 0.88);
+  --bg-elev: #151d2c;
+  --bg-soft: #1b2436;
+  --text: #e8ecf6;
+  --muted: #9aa6bd;
+  --muted-2: #6f7b91;
+  --line: rgba(232, 236, 246, 0.1);
+  --accent: #6f9bf2;
+  --accent-strong: #8fb2f7;
+  --accent-soft: rgba(111, 155, 242, 0.16);
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --switch-bg: #33405a;
+  --shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 30px 80px rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -1329,6 +1331,201 @@ svg {
 
 .settings-section .btn.block {
   margin-top: 14px;
+}
+
+/* MARK: - Выбор и создание тем */
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+  margin: 12px 0 2px;
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-soft);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+
+.theme-card:active {
+  transform: scale(0.985);
+}
+
+.theme-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.theme-card[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.theme-swatch {
+  display: flex;
+  height: 36px;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.theme-swatch i {
+  flex: 1;
+}
+
+.theme-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-card-hint {
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.theme-card-tools {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  gap: 4px;
+}
+
+.theme-tool {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.theme-tool:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.theme-maker {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.theme-maker > summary {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--accent);
+  cursor: pointer;
+  list-style: none;
+}
+
+.theme-maker > summary::-webkit-details-marker {
+  display: none;
+}
+
+.theme-maker > summary::before {
+  content: "+";
+  display: inline-block;
+  width: 18px;
+  font-weight: 700;
+}
+
+.theme-maker[open] > summary::before {
+  content: "–";
+}
+
+.theme-colors {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.color-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.color-field input[type="color"] {
+  width: 100%;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  cursor: pointer;
+}
+
+.color-field input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-field input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 7px;
+}
+
+.theme-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  transition: background-color 0.15s ease;
+}
+
+.theme-preview-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 650;
+}
+
+.theme-preview-text {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.theme-preview-btn {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.theme-actions {
+  margin-top: 14px;
+}
+
+.theme-actions .btn.block + .btn.block {
+  margin-top: 8px;
 }
 
 /* MARK: - Тост */
